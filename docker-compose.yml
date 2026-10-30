@@ -1,0 +1,94 @@
+services:
+  # ============================================================
+  # 1. Database Service (MySQL 8.0)
+  # ============================================================
+  db:
+    image: mysql:8.0
+    container_name: rasanusantara-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_NAME:-rasanusantara_db}
+      MYSQL_USER: ${DB_USER:-umkm_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-umkm_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${DB_ROOT_PASSWORD:-rootpassword} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ============================================================
+  # 2. Backend API Service (Express + Prisma ORM + Node.js 20)
+  # ============================================================
+  backend:
+    build:
+      context: "./rasanusantara api"
+      dockerfile: Dockerfile
+    container_name: rasanusantara-backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: mysql://${DB_USER:-umkm_user}:${DB_PASSWORD:-umkm_password}@db:3306/${DB_NAME:-rasanusantara_db}
+      JWT_SECRET: ${JWT_SECRET:-rasanusantara_production_secret_jwt_key_2026_super_secure}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-1000}
+    ports:
+      - "${PORT:-5000}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  # ============================================================
+  # 3. Frontend Service (Next.js 16 Standalone)
+  # ============================================================
+  frontend:
+    build:
+      context: "./website rasanusantara"
+      dockerfile: Dockerfile
+    container_name: rasanusantara-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      # Komunikasi internal antar-kontainer melalui Docker Network menggunakan nama service:
+      INTERNAL_API_URL: http://backend:5000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+
+# ============================================================
+# Networks & Persistent Volumes
+# ============================================================
+networks:
+  app-network:
+    name: rasanusantara-network
+    driver: bridge
+
+volumes:
+  mysql_data:
+    name: rasanusantara-mysql-data
+    driver: local

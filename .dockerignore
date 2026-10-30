@@ -1,0 +1,9 @@
+.git
+.gitignore
+node_modules
+"website rasanusantara/node_modules"
+"rasanusantara api/node_modules"
+"website rasanusantara/.next"
+"rasanusantara api/dist"
+.env*.local
+*.log

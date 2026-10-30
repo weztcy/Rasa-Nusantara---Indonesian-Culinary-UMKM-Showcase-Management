@@ -1,0 +1,179 @@
+// Prisma Schema for RasaNusantara UMKM Food Showcase
+// Database: MySQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PARTNER
+  USER
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum PartnerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(PARTNER)
+  phone     String?
+  brandName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  producer  Producer?
+
+  @@map("users")
+}
+
+model Producer {
+  id              String   @id @default(uuid())
+  name            String
+  owner           String
+  city            String
+  province        String
+  waNumber        String
+  story           String   @db.Text
+  avatar          String?
+  establishedYear Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  products        Product[]
+
+  @@map("producers")
+}
+
+model Category {
+  id          String    @id
+  name        String
+  icon        String
+  description String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  name            String
+  slug            String      @unique
+  categoryId      String
+  category        Category    @relation(fields: [categoryId], references: [id])
+  price           Float
+  originalPrice   Float?
+  unit            String
+  weightGram      Int         @default(200)
+  rating          Float       @default(5.0)
+  reviewCount     Int         @default(0)
+  soldCount       Int         @default(0)
+  image           String      @db.Text
+  gallery         String?     @db.Text
+  description     String      @db.Text
+  ingredients     String      @db.Text
+  shelfLife       String
+  spicyLevel      Int         @default(0)
+  certifications  String      @db.Text
+  producerId      String
+  producer        Producer    @relation(fields: [producerId], references: [id], onDelete: Cascade)
+  isBestSeller    Boolean     @default(false)
+  isNew           Boolean     @default(false)
+  stockStatus     String      @default("ready")
+  tags            String?     @db.Text
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id              String       @id @default(uuid())
+  orderNumber     String       @unique
+  customerName    String
+  customerPhone   String
+  customerAddress String       @db.Text
+  customerNotes   String?      @db.Text
+  totalPrice      Float
+  totalWeightGram Int          @default(200)
+  status          OrderStatus  @default(PENDING)
+  shippingCourier String?
+  trackingNumber  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  quantity        Int      @default(1)
+  priceAtPurchase Float
+  note            String?
+
+  @@map("order_items")
+}
+
+model PartnerSubmission {
+  id            String        @id @default(uuid())
+  brandName     String
+  ownerName     String
+  city          String
+  waNumber      String
+  category      String
+  certification String
+  description   String        @db.Text
+  status        PartnerStatus @default(PENDING)
+  submittedAt   DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("partner_submissions")
+}
+
+model StoreSetting {
+  id           String   @id @default("default")
+  storeName    String
+  tagline      String
+  primaryPhone String
+  email        String
+  address      String   @db.Text
+  bankAccount  String
+  bankName     String
+  bankHolder   String
+  announcement String   @db.Text
+  updatedAt    DateTime @updatedAt
+
+  @@map("store_settings")
+}
